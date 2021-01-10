@@ -3,39 +3,44 @@ from pygame.locals import QUIT
 import array
 import json
 
-# global variables
+# CONFIG VARIABLES #
 WINDOWWIDTH = 500
 WINDOWHEIGHT = 400
 FPS = 500
-
 BOARDWIDTH = 5
 BOARDHEIGHT = 4
+# CONFIG VARIABLES #
 
 BOXWIDTH = WINDOWWIDTH / BOARDWIDTH
 BOXHEIGHT = WINDOWHEIGHT / BOARDHEIGHT
 
-
+#Main function
 def main():
     global FPSCLOCK, DISPLAYSURF
 
-    # Pygame initialization
+    #Initialize pygame + pygame clock
     pygame.init()
     FPSCLOCK = pygame.time.Clock()
     DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
     pygame.display.set_caption("Light Output Visualizer")
+    font = pygame.font.Font(None, 25)
 
+    #Generate array with 512 0s
     lightdata = []
     for _ in range(0, 512):
         lightdata.append(0)
 
-    font = pygame.font.Font(None, 25)
-    while True: # main game loop
+    while True: #Main loop
+        #Fill window
         DISPLAYSURF.fill((0, 0, 0))
-        # events
+        
+        #Handle pygame events
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
+        
+        #Try to open and parse json
         with open('lightdata.json') as f:
             try:
                 data = json.load(f)
@@ -44,19 +49,25 @@ def main():
                 print("An exception occurred")
             
         i = 0
-        # drawing
-        for y, _ in enumerate(range(0, BOARDHEIGHT)):
-            for x, _ in enumerate(range(0, BOARDWIDTH)):
+        #Render light values
+        for y, _ in enumerate(range(0, BOARDHEIGHT)): #For every line
+            for x, _ in enumerate(range(0, BOARDWIDTH)): #For every square in that line
+                
                 data = lightdata[i]
+                
+                #Make sure maximum value is 255
                 if data > 255:
                     data = 255
+                
+                #Draw
                 pygame.draw.rect(DISPLAYSURF, (data, data, data), (x * BOXWIDTH, y * BOXHEIGHT, BOXWIDTH, BOXHEIGHT))
                 text = font.render(str(i + 1), True, (255, 0, 0))
                 DISPLAYSURF.blit(text, (x * BOXWIDTH, y * BOXHEIGHT))
-                i += 1
+                
+                i += 1 #Increment counter
 
 
-        # update
+        #Update display and regulate FPS
         pygame.display.update()
         FPSCLOCK.tick(FPS)
 
