@@ -29,15 +29,12 @@ mqttfailflag = False
 #Mqtt connection callbacks
 def on_connect(client, userdata, flags, rc):
     print("MQTT client connected!")
+    client.publish(BaseTopic + "/avail" ,"online",qos=0,retain=True)
 
 def on_disconnect(client, userdata, rc):
    print("MQTT connection lost")
 
 def on_message(client, userdata, message):
-    #print("message received " ,str(message.payload.decode("utf-8")))
-    #print("message topic=",message.topic)
-    #print("message qos=",message.qos)
-    #print("message retain flag=",message.retain)
     lightid = int(message.topic.split("/")[1])
     inPayload = json.loads(str(message.payload.decode("utf-8")))
     if "state" in inPayload:
@@ -54,9 +51,7 @@ def publishLightState(lightid):
     else:
         stateonoff = "OFF"
     data = {"state": stateonoff, "brightness": curLightBright[lightid]}
-    print(data)
     jsonData = json.dumps(data)
-    print(jsonData)
     client.publish(BaseTopic + "/" + str(lightid) ,jsonData,qos=0,retain=True)
 
 #Render values from statekeeper arrays to lights
@@ -81,6 +76,7 @@ def main():
     global client
     def exitprogram():
         print('You pressed Ctrl+C! Exiting Program.')
+        client.publish(BaseTopic + "/avail" ,"offline",qos=0,retain=True)
         outputData = []
         for _ in range(0, RenderChannels):
             outputData.append(0)
