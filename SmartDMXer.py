@@ -111,6 +111,7 @@ def main():
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
     client.on_message=on_message #attach function to callback
+    client.will_set(BaseTopic + "/avail","offline",qos=1,retain=False)
     #Try to connect, set flag if unable
     try:
         client.connect(BrokerHost, port=BrokerPort)
