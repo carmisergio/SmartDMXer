@@ -37,7 +37,7 @@ def main():
     def exitprogram():
         print('You pressed Ctrl+C! Exiting Program.')
         outputData = []
-        for i, value in enumerate(range(0, 512)):
+        for _ in range(0, 512):
             outputData.append(0)
         data = {"data": outputData}
         with open('lightdata.json', 'w+') as json_file:
@@ -49,11 +49,11 @@ def main():
     FPSCLOCK = pygame.time.Clock()
     signal.signal(signal.SIGINT, signal_handler)
 
-    for number in range(0, 512):
+    for _ in range(0, 512):
         curLightState.append(False)
 
 
-    for number in range(0, 512):
+    for _ in range(0, 512):
         curLightBright.append(255)
 
     #print(curLightBright)
@@ -61,10 +61,10 @@ def main():
     lightRenderer = threading.Thread(target=renderLights, args=("Thread-1", ), daemon=True)
     lightRenderer.start()
 
-    for box, element in enumerate(range(0, 20)):
+    for box, _ in enumerate(range(0, 20)):
         curLightBright[box] = 0
         curLightState[box] = 0
-        for i, element in enumerate(range(0, 255)):
+        for i, _ in enumerate(range(0, 255)):
             curLightBright[box] = i
             if i > 0:
                 curLightState[box] = True
