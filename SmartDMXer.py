@@ -37,6 +37,8 @@ def on_disconnect(client, userdata, rc):
 def on_message(client, userdata, message):
     lightid = int(message.topic.split("/")[1])
     inPayload = json.loads(str(message.payload.decode("utf-8")))
+    if "brightness" in inPayload:
+        curLightBright[lightid] = int(inPayload["brightness"])
     if "state" in inPayload:
         if inPayload["state"] == "ON":
             curLightState[lightid] = True
