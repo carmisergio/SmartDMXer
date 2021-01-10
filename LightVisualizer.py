@@ -9,6 +9,7 @@ WINDOWHEIGHT = 400
 FPS = 500
 BOARDWIDTH = 5
 BOARDHEIGHT = 4
+FILEPATH = "lightdata.json"
 # CONFIG VARIABLES #
 
 BOXWIDTH = WINDOWWIDTH / BOARDWIDTH
@@ -41,7 +42,7 @@ def main():
                 sys.exit()
         
         #Try to open and parse json
-        with open('lightdata.json') as f:
+        with open(FILEPATH) as f:
             try:
                 data = json.load(f)
                 lightdata = data["data"]
