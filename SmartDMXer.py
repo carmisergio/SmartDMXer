@@ -9,7 +9,9 @@ import paho.mqtt.client as mqtt
 
 #  CONFIG VARIABLES #
 RenderFPS = 60
-LightChannels = 512
+RenderChannels = 512
+SubscribeChannels = 20
+BaseTopic = "mansardalight"
 ClientName = "SmartDMXer"
 BrokerHost = "192.168.1.61"
 BrokerPort = 1883
@@ -31,6 +33,32 @@ def on_connect(client, userdata, flags, rc):
 def on_disconnect(client, userdata, rc):
    print("MQTT connection lost")
 
+def on_message(client, userdata, message):
+    #print("message received " ,str(message.payload.decode("utf-8")))
+    #print("message topic=",message.topic)
+    #print("message qos=",message.qos)
+    #print("message retain flag=",message.retain)
+    lightid = int(message.topic.split("/")[1])
+    inPayload = json.loads(str(message.payload.decode("utf-8")))
+    if "state" in inPayload:
+        if inPayload["state"] == "ON":
+            curLightState[lightid] = True
+        elif inPayload["state"] == "OFF":
+            curLightState[lightid] = False
+        publishLightState(lightid)
+
+def publishLightState(lightid):
+    global client
+    if curLightState[lightid]:
+        stateonoff = "ON"
+    else:
+        stateonoff = "OFF"
+    data = {"state": stateonoff, "brightness": curLightBright[lightid]}
+    print(data)
+    jsonData = json.dumps(data)
+    print(jsonData)
+    client.publish(BaseTopic + "/" + str(lightid) ,jsonData,qos=0,retain=True)
+
 #Render values from statekeeper arrays to lights
 def renderLights(_):
     global curLightState
@@ -50,10 +78,11 @@ def renderLights(_):
             json.dump(data, json_file)
         FPSCLOCK2.tick(RenderFPS)
 def main():
+    global client
     def exitprogram():
         print('You pressed Ctrl+C! Exiting Program.')
         outputData = []
-        for _ in range(0, LightChannels):
+        for _ in range(0, RenderChannels):
             outputData.append(0)
         data = {"data": outputData}
         with open('lightdata.json', 'w+') as json_file:
@@ -66,11 +95,11 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     print("Generating statekeeper arrays...")
-    for _ in range(0, LightChannels):
+    for _ in range(0, RenderChannels):
         curLightState.append(False)
 
 
-    for _ in range(0, LightChannels):
+    for _ in range(0, RenderChannels):
         curLightBright.append(255)
 
     print("Starting light output")
@@ -83,6 +112,7 @@ def main():
         client.username_pw_set(username=MqttUser,password=MqttPass)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
+    client.on_message=on_message #attach function to callback
     #Try to connect, set flag if unable
     try:
         client.connect(BrokerHost, port=BrokerPort)
@@ -91,6 +121,9 @@ def main():
         time.sleep(SleepTime)
     else:
         mqttfailflag = False
+
+    for i in range(0, SubscribeChannels):
+        client.subscribe(BaseTopic + "/" + str(i) + "/set")
 
     while True:
         #Handle this software coming online before the mqtt server
