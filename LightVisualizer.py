@@ -1,5 +1,5 @@
 import pygame, sys, random
-from pygame.locals import *
+from pygame.locals import QUIT 
 import array
 import json
 
@@ -25,7 +25,7 @@ def main():
     pygame.display.set_caption("Light Output Visualizer")
 
     lightdata = []
-    for number in range(0, 512):
+    for _ in range(0, 512):
         lightdata.append(0)
 
     font = pygame.font.Font(None, 25)
@@ -45,8 +45,8 @@ def main():
             
         i = 0
         # drawing
-        for y, line in enumerate(range(0, BOARDHEIGHT)):
-            for x, box in enumerate(range(0, BOARDWIDTH)):
+        for y, _ in enumerate(range(0, BOARDHEIGHT)):
+            for x, _ in enumerate(range(0, BOARDWIDTH)):
                 data = lightdata[i]
                 if data > 255:
                     data = 255
