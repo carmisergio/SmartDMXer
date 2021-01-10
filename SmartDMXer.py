@@ -4,8 +4,6 @@ import pygame
 import threading
 import json
 import signal
-import sys
-import time
 
 #  CONFIG VARIABLES #
 RenderFPS = 60
@@ -16,7 +14,7 @@ curLightState = []
 curLightBright = []
 
 #Render values from statekeeper arrays to lights
-def renderLights(threadname):
+def renderLights(_):
     global curLightState
     global curLightBright
     FPSCLOCK2 = pygame.time.Clock()
