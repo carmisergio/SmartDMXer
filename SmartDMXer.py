@@ -4,14 +4,32 @@ import pygame
 import threading
 import json
 import signal
+import time
+import paho.mqtt.client as mqtt
 
 #  CONFIG VARIABLES #
 RenderFPS = 60
+LightChannels = 512
+ClientName = "SmartDMXer"
+BrokerHost = "192.168.1.61"
+BrokerPort = 1883
+MqttAuth = True
+MqttUser = "sergio"
+MqttPass = "sergio06"
+SleepTime = 5
 # /CONFIG VARIABLES #
 
 #Init statekeeper arrays 
 curLightState = []
 curLightBright = []
+
+mqttfailflag = False
+#Mqtt connection callbacks
+def on_connect(client, userdata, flags, rc):
+    print("MQTT client connected!")
+
+def on_disconnect(client, userdata, rc):
+   print("MQTT connection lost")
 
 #Render values from statekeeper arrays to lights
 def renderLights(_):
@@ -35,7 +53,7 @@ def main():
     def exitprogram():
         print('You pressed Ctrl+C! Exiting Program.')
         outputData = []
-        for _ in range(0, 512):
+        for _ in range(0, LightChannels):
             outputData.append(0)
         data = {"data": outputData}
         with open('lightdata.json', 'w+') as json_file:
@@ -47,28 +65,46 @@ def main():
     FPSCLOCK = pygame.time.Clock()
     signal.signal(signal.SIGINT, signal_handler)
 
-    for _ in range(0, 512):
+    print("Generating statekeeper arrays...")
+    for _ in range(0, LightChannels):
         curLightState.append(False)
 
 
-    for _ in range(0, 512):
+    for _ in range(0, LightChannels):
         curLightBright.append(255)
 
-    #print(curLightBright)
-    #print(curLightState)
+    print("Starting light output")
     lightRenderer = threading.Thread(target=renderLights, args=("Thread-1", ), daemon=True)
     lightRenderer.start()
 
-    for box, _ in enumerate(range(0, 20)):
-        curLightBright[box] = 0
-        curLightState[box] = 0
-        for i, _ in enumerate(range(0, 255)):
-            curLightBright[box] = i
-            if i > 0:
-                curLightState[box] = True
-            else: 
-                curLightState[box] = False
-            FPSCLOCK.tick(100)
+    #Initialize mqtt client
+    client = mqtt.Client(ClientName)
+    if MqttAuth:
+        client.username_pw_set(username=MqttUser,password=MqttPass)
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+    #Try to connect, set flag if unable
+    try:
+        client.connect(BrokerHost, port=BrokerPort)
+    except:
+        mqttfailflag = True
+        time.sleep(SleepTime)
+    else:
+        mqttfailflag = False
+
+    while True:
+        #Handle this software coming online before the mqtt server
+        if mqttfailflag:
+            try:
+                print("Retrying mqtt connection...")
+                client.connect(BrokerHost, port=BrokerPort)
+            except:
+                mqttfailflag = True
+                print("Mqtt Connection Error")
+                time.sleep(SleepTime)
+            else:
+                mqttfailflag = False
+        client.loop()
     exitprogram()   
 
 if __name__ == "__main__":
