@@ -29,6 +29,8 @@ mqttfailflag = False
 #Mqtt connection callbacks
 def on_connect(client, userdata, flags, rc):
     print("MQTT client connected!")
+    for i in range(0, SubscribeChannels):
+        publishLightState(i)
     client.publish(BaseTopic + "/avail" ,"online",qos=0,retain=True)
 
 def on_disconnect(client, userdata, rc):
@@ -73,6 +75,7 @@ def renderLights(_):
         data = {"data": outputData}
         with open('lightdata.json', 'w+') as json_file:
             json.dump(data, json_file)
+        print("rendering...")
         FPSCLOCK2.tick(RenderFPS)
 def main():
     global client
@@ -137,6 +140,8 @@ def main():
             else:
                 mqttfailflag = False
         client.loop()
+        
+        
     exitprogram()   
 
 if __name__ == "__main__":
