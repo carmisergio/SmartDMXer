@@ -9,7 +9,7 @@ import paho.mqtt.client as mqtt
 
 #  CONFIG VARIABLES #
 RenderFPS = 60
-RenderChannels = 512
+RenderChannels = 100
 SubscribeChannels = 20
 BaseTopic = "mansardalight"
 ClientName = "SmartDMXer"
@@ -32,6 +32,8 @@ def on_connect(client, userdata, flags, rc):
     for i in range(0, SubscribeChannels):
         publishLightState(i)
     client.publish(BaseTopic + "/avail" ,"online",qos=0,retain=True)
+    for i in range(0, SubscribeChannels):
+        client.subscribe(BaseTopic + "/" + str(i) + "/set")
 
 def on_disconnect(client, userdata, rc):
    print("MQTT connection lost")
@@ -59,29 +61,23 @@ def publishLightState(lightid):
     client.publish(BaseTopic + "/" + str(lightid) ,jsonData,qos=0,retain=True)
 
 #Render values from statekeeper arrays to lights
-def renderLights(_):
-    global curLightState
-    global curLightBright
-    FPSCLOCK2 = pygame.time.Clock()
+def renderLights(curLightState, curLightBright):
     outputData = []
-    while True:
-        outputData = []
-        for i, value in enumerate(curLightState):
-            if value:
-                outputData.append(curLightBright[i])
-            else:
-                outputData.append(0)
-        #print(len(outputData))
-        data = {"data": outputData}
-        with open('lightdata.json', 'w+') as json_file:
-            json.dump(data, json_file)
-        print("rendering...")
-        FPSCLOCK2.tick(RenderFPS)
+    outputData = []
+    for i, value in enumerate(curLightState):
+        if value:
+            outputData.append(curLightBright[i])
+        else:
+            outputData.append(0)
+    data = {"data": outputData}
+    with open('lightdata.json', 'w+') as json_file:
+        json.dump(data, json_file)
 def main():
     global client
     def exitprogram():
         print('You pressed Ctrl+C! Exiting Program.')
         client.publish(BaseTopic + "/avail" ,"offline",qos=0,retain=True)
+        client.loop_stop()
         outputData = []
         for _ in range(0, RenderChannels):
             outputData.append(0)
@@ -89,7 +85,7 @@ def main():
         with open('lightdata.json', 'w+') as json_file:
             json.dump(data, json_file)
         exit()
-
+    print("SmartDMXer DMX engine is starting!")
     def signal_handler(sig, frame):
         exitprogram()
     FPSCLOCK = pygame.time.Clock()
@@ -104,10 +100,16 @@ def main():
         curLightBright.append(255)
 
     print("Starting light output")
-    lightRenderer = threading.Thread(target=renderLights, args=("Thread-1", ), daemon=True)
-    lightRenderer.start()
+    lightOutput = True
 
     #Initialize mqtt client
+    print("Initializing MQTT Client...")
+    print("Host: " + str(BrokerHost))
+    print("Port: " + str(BrokerPort))
+    if MqttAuth:
+        print("Using MQTT autentication")
+    else:
+        print("MQTT autentication not necessary")
     client = mqtt.Client(ClientName)
     if MqttAuth:
         client.username_pw_set(username=MqttUser,password=MqttPass)
@@ -115,33 +117,14 @@ def main():
     client.on_disconnect = on_disconnect
     client.on_message=on_message #attach function to callback
     client.will_set(BaseTopic + "/avail","offline",qos=1,retain=False)
-    #Try to connect, set flag if unable
-    try:
-        client.connect(BrokerHost, port=BrokerPort)
-    except:
-        mqttfailflag = True
-        time.sleep(SleepTime)
-    else:
-        mqttfailflag = False
-
-    for i in range(0, SubscribeChannels):
-        client.subscribe(BaseTopic + "/" + str(i) + "/set")
-
+    client.connect(BrokerHost, port=BrokerPort)
+    client.loop_start()
     while True:
-        #Handle this software coming online before the mqtt server
-        if mqttfailflag:
-            try:
-                print("Retrying mqtt connection...")
-                client.connect(BrokerHost, port=BrokerPort)
-            except:
-                mqttfailflag = True
-                print("Mqtt Connection Error")
-                time.sleep(SleepTime)
-            else:
-                mqttfailflag = False
-        client.loop()
-        
-        
+        if lightOutput:
+            lightRenderer = threading.Thread(target=renderLights, args=(curLightState, curLightBright ))
+            lightRenderer.start()
+        print(FPSCLOCK.get_fps())
+        FPSCLOCK.tick(RenderFPS)
     exitprogram()   
 
 if __name__ == "__main__":
