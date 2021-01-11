@@ -19,6 +19,7 @@ MqttAuth = True
 MqttUser = "sergio"
 MqttPass = "sergio06"
 SleepTime = 5
+FilePath = "files/lightdata.json"
 # /CONFIG VARIABLES #
 
 #Init statekeeper arrays 
@@ -70,7 +71,7 @@ def renderLights(curLightState, curLightBright):
         else:
             outputData.append(0)
     data = {"data": outputData}
-    with open('lightdata.json', 'w+') as json_file:
+    with open(FilePath, 'w+') as json_file:
         json.dump(data, json_file)
 def main():
     global client
@@ -82,7 +83,7 @@ def main():
         for _ in range(0, RenderChannels):
             outputData.append(0)
         data = {"data": outputData}
-        with open('lightdata.json', 'w+') as json_file:
+        with open(FilePath, 'w+') as json_file:
             json.dump(data, json_file)
         exit()
     print("SmartDMXer DMX engine is starting!")
