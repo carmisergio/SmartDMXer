@@ -20,11 +20,15 @@ MqttUser = "sergio"
 MqttPass = "sergio06"
 SleepTime = 5
 FilePath = "files/lightdata.json"
+DefaultTransition = 1 #s
 # /CONFIG VARIABLES #
 
 #Init statekeeper arrays 
-curLightState = []
+haLightBright = []
+halightState = []
 curLightBright = []
+FadeDelta = []
+FadeTarget = []
 
 mqttfailflag = False
 #Mqtt connection callbacks
@@ -40,36 +44,45 @@ def on_disconnect(client, userdata, rc):
    print("MQTT connection lost")
 
 def on_message(client, userdata, message):
+    global curLightBright
+    global halightState
+    global haLightBright
+    global FadeDelta
+    global FadeTarget
     lightid = int(message.topic.split("/")[1])
     inPayload = json.loads(str(message.payload.decode("utf-8")))
-    if "brightness" in inPayload:
-        curLightBright[lightid] = int(inPayload["brightness"])
     if "state" in inPayload:
         if inPayload["state"] == "ON":
-            curLightState[lightid] = True
+            #if not halightState[lightid]:
+            if "brightness" in inPayload:
+                print("Brightness in input")
+                haLightBright[lightid] = int(inPayload["brightness"])
+            FadeTarget[lightid] = int(haLightBright[lightid])
+            if FadeTarget != curLightBright:
+                FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (DefaultTransition * RenderFPS)
+            halightState[lightid] = True
         elif inPayload["state"] == "OFF":
-            curLightState[lightid] = False
+            if curLightBright != 0:
+                FadeTarget[lightid] = 0
+                FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (DefaultTransition * RenderFPS)
+                halightState[lightid] = False
         publishLightState(lightid)
 
 def publishLightState(lightid):
     global client
-    if curLightState[lightid]:
+    if halightState[lightid]:
         stateonoff = "ON"
     else:
         stateonoff = "OFF"
-    data = {"state": stateonoff, "brightness": curLightBright[lightid]}
+    data = {"state": stateonoff, "brightness": haLightBright[lightid]}
     jsonData = json.dumps(data)
     client.publish(BaseTopic + "/" + str(lightid) ,jsonData,qos=0,retain=True)
 
 #Render values from statekeeper arrays to lights
-def renderLights(curLightState, curLightBright):
+def renderLights():
     outputData = []
-    outputData = []
-    for i, value in enumerate(curLightState):
-        if value:
-            outputData.append(curLightBright[i])
-        else:
-            outputData.append(0)
+    for i, bright in enumerate(curLightBright):
+        outputData.append(int(bright))
     data = {"data": outputData}
     with open(FilePath, 'w+') as json_file:
         json.dump(data, json_file)
@@ -93,12 +106,13 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     print("Generating statekeeper arrays...")
-    for _ in range(0, RenderChannels):
-        curLightState.append(False)
-
 
     for _ in range(0, RenderChannels):
-        curLightBright.append(255)
+        haLightBright.append(255)
+        halightState.append(False)
+        curLightBright.append(0)
+        FadeDelta.append(0)
+        FadeTarget.append(255)
 
     print("Starting light output")
     lightOutput = True
@@ -121,10 +135,30 @@ def main():
     client.connect(BrokerHost, port=BrokerPort)
     client.loop_start()
     while True:
+        for lightid in range(0, RenderChannels):
+            if FadeDelta[lightid] != 0:
+                if FadeDelta[lightid] > 0:
+                    #print("FadingUp")
+                    if curLightBright[lightid] < FadeTarget[lightid]:
+                        curLightBright[lightid] = curLightBright[lightid] + FadeDelta[lightid]
+                        if curLightBright[lightid] > 255:
+                            curLightBright[lightid] = 255
+                    else:
+                        FadeDelta[lightid] = 0
+                        print("finished fade!")
+                if FadeDelta[lightid] < 0:
+                    #print("FadingDpwn")
+                    if curLightBright[lightid] > FadeTarget[lightid]:
+                        curLightBright[lightid] = curLightBright[lightid] + FadeDelta[lightid]
+                        if curLightBright[lightid] < 0:
+                            curLightBright[lightid] = 0
+                    else:
+                        FadeDelta[lightid] = 0
+                        print("finished fade!")
         if lightOutput:
-            lightRenderer = threading.Thread(target=renderLights, args=(curLightState, curLightBright ))
+            lightRenderer = threading.Thread(target=renderLights)
             lightRenderer.start()
-        print(FPSCLOCK.get_fps())
+        #print(FPSCLOCK.get_fps())
         FPSCLOCK.tick(RenderFPS)
     exitprogram()   
 
