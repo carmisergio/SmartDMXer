@@ -10,7 +10,7 @@ import paho.mqtt.client as mqtt
 #  CONFIG VARIABLES #
 RenderFPS = 60
 RenderChannels = 100
-SubscribeChannels = 20
+SubscribeChannels = 100
 BaseTopic = "mansardalight"
 ClientName = "SmartDMXer"
 BrokerHost = "192.168.1.61"
@@ -50,23 +50,55 @@ def on_message(client, userdata, message):
     global FadeDelta
     global FadeTarget
     lightid = int(message.topic.split("/")[1])
-    inPayload = json.loads(str(message.payload.decode("utf-8")))
+    inPayload = {}
+    try:
+        inPayload = json.loads(str(message.payload.decode("utf-8")))
+    except:
+        print("ERROR: unable to parse incoming MQTT message")
     if "state" in inPayload:
-        if inPayload["state"] == "ON":
-            #if not halightState[lightid]:
-            if "brightness" in inPayload:
-                print("Brightness in input")
-                haLightBright[lightid] = int(inPayload["brightness"])
-            FadeTarget[lightid] = int(haLightBright[lightid])
-            if FadeTarget != curLightBright:
-                FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (DefaultTransition * RenderFPS)
-            halightState[lightid] = True
-        elif inPayload["state"] == "OFF":
-            if curLightBright != 0:
-                FadeTarget[lightid] = 0
-                FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (DefaultTransition * RenderFPS)
+        if "transition" in inPayload:
+            transition = inPayload["transition"]
+        else:
+            transition = DefaultTransition
+        if transition != 0:
+            if inPayload["state"] == "ON":
+                #if not halightState[lightid]:
+                if "brightness" in inPayload:
+                    print("Brightness in input")
+                    haLightBright[lightid] = int(inPayload["brightness"])
+                FadeTarget[lightid] = int(haLightBright[lightid])
+                if FadeTarget[lightid] != curLightBright[lightid]:
+                    FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (transition * RenderFPS)
+                if haLightBright[lightid] == 0:
+                    halightState[lightid] = False
+                else:
+                    halightState[lightid] = True
+            elif inPayload["state"] == "OFF":
+                if curLightBright[lightid] != 0:
+                    FadeTarget[lightid] = 0
+                    FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (transition * RenderFPS)
                 halightState[lightid] = False
+        else:
+            if inPayload["state"] == "ON":
+                #if not halightState[lightid]:
+                if "brightness" in inPayload:
+                    print("Brightness in input")
+                    haLightBright[lightid] = int(inPayload["brightness"])
+                FadeTarget[lightid] = int(haLightBright[lightid])
+                if FadeTarget[lightid] != curLightBright[lightid]:
+                    curLightBright[lightid] = FadeTarget[lightid]
+                if haLightBright[lightid] == 0:
+                    halightState[lightid] = False
+                else:
+                    halightState[lightid] = True
+            elif inPayload["state"] == "OFF":
+                if curLightBright[lightid] != 0:
+                    FadeTarget[lightid] = 0
+                    curLightBright[lightid] = FadeTarget[lightid]
+                    halightState[lightid] = False
+
         publishLightState(lightid)
+        print(inPayload)
 
 def publishLightState(lightid):
     global client
@@ -132,7 +164,10 @@ def main():
     client.on_disconnect = on_disconnect
     client.on_message=on_message #attach function to callback
     client.will_set(BaseTopic + "/avail","offline",qos=1,retain=False)
-    client.connect(BrokerHost, port=BrokerPort)
+    try:
+        client.connect(BrokerHost, port=BrokerPort)
+    except:
+        print("MQTT connection failed.")
     client.loop_start()
     while True:
         for lightid in range(0, RenderChannels):
