@@ -7,6 +7,7 @@ import signal
 import time
 import paho.mqtt.client as mqtt
 import yaml
+import argparse
 
 # DEFAULTS IF NOT IN CONFIG #
 RenderFPS = 60
@@ -32,6 +33,20 @@ FadeTarget = []
 
 mqttfailflag = False
 #Mqtt connection callbacks
+
+def handleArguments():
+    global ConfigPath
+    
+    # Construct the argument parser
+    ap = argparse.ArgumentParser()
+
+    # Add the arguments to the parser
+    ap.add_argument("-c", "--config", required=False,
+    help="Config file path")
+    args = vars(ap.parse_args())
+    for key in args:
+        if key == "config" and args[key] != None:
+            ConfigPath = args[key]
 
 def parseConfig():
     global RenderFPS
@@ -167,13 +182,13 @@ def on_message(client, userdata, message):
                     halightState[lightid] = False
                 else:
                     halightState[lightid] = True
-                print("INFO: start fade on CH" + str(lightid + 1) + " from " + str(int(curLightBright[lightid])) + " to " + str(int(FadeTarget[lightid])) + ", delta " + str(FadeDelta[lightid]))
+                print("INFO: start fade on CH" + str(lightid + 1) + " from " + str(int(curLightBright[lightid])) + " to " + str(int(FadeTarget[lightid])) + ", delta " + "{:.2f}".format(FadeDelta[lightid]))
             elif inPayload["state"] == "OFF":
                 if curLightBright[lightid] != 0:
                     FadeTarget[lightid] = 0
                     FadeDelta[lightid] = (FadeTarget[lightid] - curLightBright[lightid]) / (transition * RenderFPS)
                 halightState[lightid] = False
-                print("INFO: start fade on CH" + str(lightid + 1) + " from " + str(int(curLightBright[lightid])) + " to " + str(int(FadeTarget[lightid])) + ", delta " + str(FadeDelta[lightid]))
+                print("INFO: start fade on CH" + str(lightid + 1) + " from " + str(int(curLightBright[lightid])) + " to " + str(int(FadeTarget[lightid])) + ", delta " + "{:.2f}".format(FadeDelta[lightid]))
         else:
             if inPayload["state"] == "ON":
                 #if not halightState[lightid]:
@@ -226,6 +241,9 @@ def renderLights():
 def main():
     global client
     #  PUT BANNER print("SmartDMXer DMX engine is starting!")
+    
+    handleArguments()
+    
     def signal_handler(sig, frame):
         print('ERRROR: user pressed CTRL+C, exiting...')
         exitprogram()
